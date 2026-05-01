@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scholarship Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:       #16140F;
+  --ink2:      #4A4740;
+  --ink3:      #8C8980;
+  --paper:     #F7F5F0;
+  --card:      #FFFFFF;
+  --border:    #E4E1DA;
+  --border2:   #CBC7BE;
+  --green:     #1C5C3A;
+  --green-bg:  #EAF3ED;
+  --amber:     #7A4B08;
+  --amber-bg:  #FEF7E7;
+  --red:       #942222;
+  --red-bg:    #FEF0EF;
+  --blue:      #1A4A7A;
+  --blue-bg:   #EAF0FA;
+  --teal:      #0F5A5A;
+  --teal-bg:   #E6F4F4;
+  --purple:    #4A2A7A;
+  --purple-bg: #F2EDF9;
+  --mono-bg:   #F0EDE7;
+  --r:         10px;
+  --r-lg:      14px;
+  --sh:        0 1px 3px rgba(22,20,15,.06), 0 1px 2px rgba(22,20,15,.04);
+  --sh-md:     0 4px 16px rgba(22,20,15,.10);
+  --sh-hover:  0 6px 24px rgba(22,20,15,.13);
+}
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* ── HERO ── */
+.hero {
+  background: var(--green);
+  padding: 52px 56px 44px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 80% 50%, rgba(255,255,255,.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+.hero-inner { max-width: 1120px; margin: 0 auto; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,.6); margin-bottom: 18px;
+}
+.hero-eyebrow span {
+  display: inline-block; width: 24px; height: 1px;
+  background: rgba(255,255,255,.3);
+}
+.hero h1 {
+  font-family: 'Lora', serif;
+  font-size: 42px; font-weight: 500; line-height: 1.15;
+  color: #fff; margin-bottom: 10px; max-width: 560px;
+}
+.hero-sub {
+  font-size: 14px; color: rgba(255,255,255,.75);
+  max-width: 480px; line-height: 1.65; margin-bottom: 20px;
+}
+.hero-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.hero-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: rgba(255,255,255,.5);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 4px; padding: 3px 8px;
+}
+
+/* ── STATS STRIP ── */
+.stats-strip {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.stats-inner {
+  max-width: 1120px; margin: 0 auto; padding: 0 56px;
+  display: flex; gap: 0; overflow-x: auto;
+}
+.stat {
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 32px 18px 0; margin-right: 32px;
+  border-right: 1px solid var(--border); flex-shrink: 0;
+}
+.stat:last-child { border-right: none; margin-right: 0; }
+.stat-pip { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.stat-n { font-size: 22px; font-weight: 700; line-height: 1; }
+.stat-l { font-size: 11px; color: var(--ink3); margin-top: 2px; letter-spacing: 0.04em; }
+
+/* ── STATE SCREENS ── */
+.state-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 40vh; gap: 14px; padding: 60px 20px;
+}
+.state-title { font-size: 17px; font-weight: 600; color: var(--ink); }
+.state-sub   { font-size: 13px; color: var(--ink3); text-align: center; max-width: 400px; line-height: 1.6; }
+.state-sub code {
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  background: var(--mono-bg); padding: 1px 6px; border-radius: 4px;
+}
+.spin {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--green);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TOOLBAR ── */
+.toolbar-wrap {
+  background: var(--card); border-bottom: 1px solid var(--border); padding: 0 56px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(22,20,15,.04);
+}
+.toolbar {
+  max-width: 1120px; margin: 0 auto;
+  display: flex; align-items: center; gap: 8px; padding: 12px 0;
+}
+
+/* Always-visible: search + filter toggle + sort */
+.search-box {
+  flex: 1; min-width: 140px; position: relative;
+}
+.search-box input {
+  width: 100%; padding: 8px 11px;
+  font-family: 'Syne', sans-serif; font-size: 13px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper); color: var(--ink); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.search-box input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(28,92,58,.08); }
+.search-box input::placeholder { color: var(--ink3); }
+
+/* Filter toggle button */
+.filter-toggle-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper); color: var(--ink2); cursor: pointer;
+  transition: all .15s; white-space: nowrap; flex-shrink: 0;
+}
+.filter-toggle-btn:hover { border-color: var(--border2); }
+.filter-toggle-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+.filter-toggle-btn .filter-count {
+  display: none; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(255,255,255,.3); font-size: 10px; font-weight: 700;
+}
+.filter-toggle-btn.has-filters .filter-count { display: flex; }
+
+.sort-group { display: flex; gap: 3px; flex-shrink: 0; }
+.sort-btn {
+  padding: 7px 12px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper); color: var(--ink2); cursor: pointer;
+  transition: all .15s;
+}
+.sort-btn:hover  { border-color: var(--border2); }
+.sort-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+.expand-all-btn {
+  padding: 7px 12px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--ink2); cursor: pointer;
+  transition: all .15s; white-space: nowrap; flex-shrink: 0;
+}
+.expand-all-btn:hover { border-color: var(--border2); background: var(--mono-bg); }
+
+/* ── FILTER PANEL (replaces inline selects) ── */
+.filter-panel {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 56px;
+  max-height: 0; overflow: hidden;
+  transition: max-height .25s ease, padding .25s ease;
+}
+.filter-panel.open {
+  max-height: 200px;
+  padding: 16px 56px;
+}
+.filter-panel-inner {
+  max-width: 1120px; margin: 0 auto;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.filter-panel-inner select {
+  padding: 8px 28px 8px 10px;
+  font-family: 'Syne', sans-serif; font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath d='M0 0l4.5 5L9 0z' fill='%238C8980'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  color: var(--ink); appearance: none; cursor: pointer; outline: none;
+  transition: border-color .15s; flex: 1; min-width: 140px;
+}
+.filter-panel-inner select:focus { border-color: var(--green); }
+.clear-filters-btn {
+  padding: 8px 14px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--ink3); cursor: pointer;
+  transition: all .15s; white-space: nowrap; flex-shrink: 0;
+}
+.clear-filters-btn:hover { color: var(--red); border-color: var(--red); }
+.clear-filters-btn { display: none; }
+.clear-filters-btn.visible { display: block; }
+
+/* ── CONTENT ── */
+.content { max-width: 1120px; margin: 0 auto; padding: 28px 56px 72px; }
+
+/* ── COUNTRY GROUP ── */
+.group { margin-bottom: 14px; }
+.group-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r-lg); cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  user-select: none;
+}
+.group-header:hover { border-color: var(--border2); box-shadow: var(--sh); }
+.group-header:focus-visible {
+  outline: 2px solid var(--green); outline-offset: 2px;
+}
+.g-name  { font-size: 14px; font-weight: 700; flex: 1; }
+
+/* Pills shown only when group is collapsed */
+.g-pills { display: flex; gap: 4px; transition: opacity .15s; }
+.group-header.open .g-pills { opacity: 0; pointer-events: none; }
+
+.pill {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 7px; border-radius: 20px;
+}
+.pill-soon { background: var(--red-bg);   color: var(--red);   }
+.pill-mid  { background: var(--amber-bg); color: var(--amber); }
+.pill-open { background: var(--green-bg); color: var(--green); }
+.g-count {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--ink3); background: var(--mono-bg);
+  border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px;
+}
+.g-arrow { color: var(--ink3); font-size: 10px; transition: transform .2s; }
+.g-arrow.open { transform: rotate(90deg); }
+
+.cards-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
+  gap: 10px;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px 17px;
+  display: flex; flex-direction: column; gap: 11px;
+  box-shadow: var(--sh);
+  /* FIX #9: no translateY — box-shadow only to avoid layout shift */
+  transition: box-shadow .15s, border-color .15s;
+  position: relative;
+}
+.card:hover { box-shadow: var(--sh-hover); border-color: var(--border2); }
+
+/* accent strip */
+.card::before {
+  content: '';
+  position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 2px 2px 0;
+  background: var(--border2);
+  transition: background .2s;
+}
+.card.soon::before  { background: var(--red);   }
+.card.mid::before   { background: var(--amber); }
+.card.open::before  { background: var(--green); }
+
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card-title { font-size: 13px; font-weight: 600; line-height: 1.45; flex: 1; }
+.badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 3px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap;
+}
+.b-soon { background: var(--red-bg);   color: var(--red);   }
+.b-mid  { background: var(--amber-bg); color: var(--amber); }
+.b-open { background: var(--green-bg); color: var(--green); }
+.b-unk  { background: var(--mono-bg);  color: var(--ink3);  }
+
+/* ── CARD META TAGS ── */
+.card-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px; font-weight: 500;
+  padding: 3px 8px; border-radius: 5px;
+  border: 1px solid transparent; line-height: 1.3;
+}
+.tag-level  { background: var(--blue-bg);   color: var(--blue);   border-color: #c8d9ef; }
+.tag-full   { background: var(--green-bg);  color: var(--green);  border-color: #bddece; }
+.tag-partial{ background: var(--amber-bg);  color: var(--amber);  border-color: #f0d9ad; }
+.tag-fund-unk{ background: var(--mono-bg);  color: var(--ink3);   border-color: var(--border); }
+.tag-elig   { background: var(--purple-bg); color: var(--purple); border-color: #d1c0ea; }
+
+/* ── CARD INFO AREA ── */
+.card-info { display: flex; flex-direction: column; gap: 5px; }
+.card-dl {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--ink2); display: flex; align-items: center; gap: 5px;
+}
+
+/* ── ELIGIBILITY ROW: only shown when restricted ── */
+/* FIX #5: suppress eligibility box for open/all-nationalities entries */
+.card-elig-row {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 11px; color: var(--ink2); line-height: 1.5;
+  background: var(--purple-bg);
+  border: 1px solid #d1c0ea;
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+.card-elig-text { flex: 1; font-family: 'DM Mono', monospace; font-size: 10.5px; }
+
+/* ── FIX #4: Apply CTA — filled, prominent ── */
+.apply-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.03em;
+  padding: 9px 16px; border-radius: var(--r);
+  border: 1.5px solid var(--green);
+  color: #fff; background: var(--green);
+  text-decoration: none;
+  transition: all .15s; align-self: stretch; margin-top: 2px;
+}
+.apply-link:hover { background: #154a2e; border-color: #154a2e; }
+.apply-link:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+
+/* ── EMPTY / ZERO RESULTS ── */
+.empty-msg {
+  text-align: center; padding: 60px 20px;
+  color: var(--ink3); font-size: 14px;
+}
+.empty-msg big { display: block; font-size: 40px; margin-bottom: 12px; }
+
+/* FIX #3: zero-results state for stats strip */
+.stats-zero {
+  font-family: 'Syne', sans-serif; font-size: 13px;
+  color: var(--ink3); padding: 16px 0;
+}
+
+/* ── PAGINATION ── */
+.pagination-wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 36px; padding-top: 24px;
+  border-top: 1px solid var(--border); flex-wrap: wrap;
+}
+.pagination-info {
+  font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink3);
+  white-space: nowrap; line-height: 1.5;
+}
+.pagination-info strong { color: var(--ink2); }
+.pagination-controls { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.pg-btn {
+  min-width: 34px; height: 34px; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--card); color: var(--ink2);
+  cursor: pointer; transition: all .15s; user-select: none;
+}
+.pg-btn:hover:not(:disabled):not(.active) { border-color: var(--border2); background: var(--mono-bg); }
+.pg-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+.pg-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+.pg-ellipsis {
+  min-width: 28px; height: 34px; display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 13px; color: var(--ink3); user-select: none;
+}
+.per-page-wrap {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink3); white-space: nowrap;
+}
+.per-page-wrap select {
+  padding: 6px 24px 6px 10px; font-size: 12px; height: 34px;
+  font-family: 'Syne', sans-serif;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--paper)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath d='M0 0l4.5 5L9 0z' fill='%238C8980'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  color: var(--ink); appearance: none; cursor: pointer; outline: none;
+}
+.per-page-wrap select:focus { border-color: var(--green); }
+
+/* ── FOOTER ── */
+footer {
+  text-align: center; padding: 28px 20px;
+  font-size: 11px; color: var(--ink3);
+  border-top: 1px solid var(--border);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .expand-all-btn { display: none; } /* hide on tablet — less critical */
+}
+
+@media (max-width: 720px) {
+  .hero         { padding: 32px 20px 28px; }
+  .hero h1      { font-size: 26px; }
+  .stats-inner  { padding: 0 20px; }
+  .stat         { padding: 12px 16px 12px 0; margin-right: 16px; }
+  .toolbar-wrap { padding: 0 14px; }
+  .filter-panel { padding: 0 14px; }
+  .filter-panel.open { padding: 14px; }
+  .content      { padding: 18px 14px 52px; }
+  .cards-grid   { grid-template-columns: 1fr; }
+
+  /* On mobile show sort inline with filter toggle */
+  .sort-group .sort-btn:not(.active) { display: none; }
+
+  /* Filter panel goes full-width column on mobile */
+  .filter-panel-inner { flex-direction: column; }
+  .filter-panel-inner select { width: 100%; min-width: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow"><span></span>Scholarship Opportunities<span></span></p>
+    <h1>Explore fully-funded &amp; partial scholarship opportunities</h1>
+    <!-- FIX #7: populated hero sub-text -->
+    <p class="hero-sub">Updated weekly from official sources. Always verify deadlines before applying.</p>
+    <div class="hero-meta">
+      <span class="hero-badge" id="updated-at">Loading…</span>
+      <span class="hero-badge" id="total-badge">— scholarships</span>
+    </div>
+  </div>
+</header>
+
+<!-- STATS STRIP -->
+<div class="stats-strip">
+  <div class="stats-inner" id="stats-strip"></div>
+</div>
+
+<!-- TOOLBAR — FIX #1: search + filter-toggle + sort only in primary bar -->
+<div class="toolbar-wrap">
+  <div class="toolbar">
+    <div class="search-box">
+      <input id="search" type="text" placeholder="Search name, source, country…" aria-label="Search scholarships" />
+    </div>
+
+    <button
+      class="filter-toggle-btn"
+      id="filter-toggle"
+      aria-expanded="false"
+      aria-controls="filter-panel"
+      onclick="toggleFilters()"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M1 3h12M3 7h8M5 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Filters
+      <span class="filter-count" id="filter-count" aria-live="polite">0</span>
+    </button>
+
+    <div class="sort-group" role="group" aria-label="Sort scholarships">
+      <button class="sort-btn active" data-sort="urgency" onclick="setSort(this)">Urgency</button>
+      <button class="sort-btn"        data-sort="az"      onclick="setSort(this)">A–Z</button>
+      <button class="sort-btn"        data-sort="count"   onclick="setSort(this)">Most</button>
+    </div>
+
+    <button class="expand-all-btn" onclick="toggleAll()">Collapse all</button>
+  </div>
+</div>
+
+<!-- FILTER PANEL — slides open below toolbar -->
+<div class="filter-panel" id="filter-panel" role="region" aria-label="Scholarship filters">
+  <div class="filter-panel-inner">
+    <select id="sel-status" aria-label="Filter by status" onchange="resetAndRender()">
+      <option value="">All statuses</option>
+      <option value="Closing Soon">Closing soon</option>
+      <option value="Closing Mid">Closing mid</option>
+      <option value="Open">Open</option>
+      <option value="Unknown">Unknown deadline</option>
+    </select>
+
+    <select id="sel-country" aria-label="Filter by country" onchange="resetAndRender()">
+      <option value="">All countries</option>
+    </select>
+
+    <select id="sel-level" aria-label="Filter by level" onchange="resetAndRender()">
+      <option value="">All levels</option>
+      <option value="PhD">PhD</option>
+      <option value="Masters">Masters</option>
+      <option value="Bachelors">Bachelors</option>
+      <option value="Postdoctoral">Postdoctoral</option>
+      <option value="Short Course / Training">Short Course</option>
+      <option value="Research Fellowship">Research Fellowship</option>
+      <option value="Multiple / Unspecified">Multiple / Unspecified</option>
+    </select>
+
+    <select id="sel-funding" aria-label="Filter by funding type" onchange="resetAndRender()">
+      <option value="">All funding</option>
+      <option value="Fully Funded">Fully Funded</option>
+      <option value="Partial">Partial</option>
+      <option value="Unknown">Unknown</option>
+    </select>
+
+    <button class="clear-filters-btn" id="clear-btn" onclick="clearFilters()">Clear all</button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen" class="state-screen">
+  <div class="spin"></div>
+  <div class="state-title">Loading scholarships…</div>
+  <div class="state-sub">Looking for <code>scholarships.json</code> in the same folder.</div>
+</div>
+
+<!-- ERROR -->
+<div id="error-screen" class="state-screen" style="display:none">
+  <div class="state-title">scholarships.json not found</div>
+  <div class="state-sub">
+    Place <code>scholarships.json</code> (exported from the Colab scraper)
+    in the <strong>same folder</strong> as this HTML file, then refresh.<br><br>
+    Run the scraper in Colab → Cell 12 downloads the file automatically.
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="content" id="main-content" style="display:none">
+  <div id="groups-container"></div>
+
+  <div class="pagination-wrap" id="pagination-wrap" style="display:none">
+    <div class="pagination-info" id="pagination-info"></div>
+    <div class="pagination-controls" id="pagination-controls"></div>
+    <div class="per-page-wrap">
+      <span>Per page:</span>
+      <select id="per-page" onchange="changePerPage(this)" aria-label="Results per page">
+        <option value="12" selected>12</option>
+        <option value="24">24</option>
+        <option value="48">48</option>
+        <option value="0">All</option>
+      </select>
+    </div>
+  </div>
+</main>
+
+<footer id="footer" style="display:none">
+  Always verify deadlines on official scholarship pages before applying.
+</footer>
+
+<script>
+/* ── Utilities ── */
+function escapeHTML(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/* ── State ── */
+let DATA        = [];
+let sortMode    = 'urgency';
+let openGroups  = {};
+let allOpen     = true;
+let currentPage = 1;
+let perPage     = 12;
+let filterPanelOpen = false;
+
+const STATUS_ORDER = { "Closing Soon":0, "Closing Mid":1, "Open":2, "Unknown":3, "Closed":4 };
+
+const FUNDING_META = {
+  "Fully Funded": { cls: "tag-full"     },
+  "Partial":      { cls: "tag-partial"  },
+  "Unknown":      { cls: "tag-fund-unk" },
+};
+
+/* Eligibility strings considered "unrestricted" — hide the box for these */
+const OPEN_ELIG_PATTERNS = [
+  /all\s+(nationalities|countries|international)/i,
+  /^open\s+to\s+all/i,
+  /worldwide/i,
+  /international\s+students/i,
+];
+
+function isRestrictedEligibility(val) {
+  if (!val || !val.trim()) return false;
+  return !OPEN_ELIG_PATTERNS.some(p => p.test(val));
+}
+
+const $ = id => document.getElementById(id);
+
+/* ── Filter panel toggle (FIX #1) ── */
+function toggleFilters() {
+  filterPanelOpen = !filterPanelOpen;
+  const panel  = $('filter-panel');
+  const toggle = $('filter-toggle');
+  panel.classList.toggle('open', filterPanelOpen);
+  toggle.setAttribute('aria-expanded', filterPanelOpen);
+  toggle.classList.toggle('active', filterPanelOpen);
+}
+
+/* ── Active filter count badge ── */
+function updateFilterBadge() {
+  const active = [
+    $('sel-status').value,
+    $('sel-country').value,
+    $('sel-level').value,
+    $('sel-funding').value,
+  ].filter(Boolean).length;
+
+  const toggle = $('filter-toggle');
+  const badge  = $('filter-count');
+  badge.textContent = active;
+  toggle.classList.toggle('has-filters', active > 0);
+  $('clear-btn').classList.toggle('visible', active > 0);
+}
+
+/* ── Load JSON ── */
+async function loadData() {
+  try {
+    const res  = await fetch('scholarships.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    DATA = (Array.isArray(json) ? json : []).filter(s => s.status !== 'Closed');
+
+    const updated = (json && !Array.isArray(json) && json.updated_at)
+      ? json.updated_at
+      : new Date().toISOString().slice(0,10);
+
+    $('updated-at').textContent  = 'updated: ' + updated;
+    $('total-badge').textContent = DATA.length + ' scholarships';
+
+    /* Populate country dropdown */
+    const countries = [...new Set(DATA.map(s => s.country))].sort();
+    const cSel = $('sel-country');
+    countries.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c; cSel.appendChild(o);
+    });
+
+    $('loading-screen').style.display = 'none';
+    $('main-content').style.display   = 'block';
+    $('footer').style.display         = 'block';
+    render();
+  } catch (err) {
+    console.error(err);
+    $('loading-screen').style.display = 'none';
+    $('error-screen').style.display   = 'flex';
+  }
+}
+
+/* ── Controls ── */
+function setSort(btn) {
+  sortMode = btn.dataset.sort;
+  currentPage = 1;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function changePerPage(sel) { perPage = parseInt(sel.value); currentPage = 1; render(); }
+function goPage(p) {
+  currentPage = p;
+  render();
+  $('main-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* FIX #10: keyboard-accessible group toggle */
+function toggleGroup(country) {
+  openGroups[country] = !openGroups[country];
+  render();
+}
+function handleGroupKey(e, country) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleGroup(country);
+  }
+}
+
+function toggleAll() {
+  allOpen = !allOpen;
+  Object.keys(openGroups).forEach(k => openGroups[k] = allOpen);
+  document.querySelector('.expand-all-btn').textContent = allOpen ? 'Collapse all' : 'Expand all';
+  render();
+}
+function clearFilters() {
+  $('search').value = '';
+  $('sel-status').value = '';
+  $('sel-country').value = '';
+  $('sel-level').value = '';
+  $('sel-funding').value = '';
+  updateFilterBadge();
+  resetAndRender();
+}
+
+/* ── Helpers ── */
+function badgeCls(s) {
+  return { "Closing Soon":"badge b-soon","Closing Mid":"badge b-mid","Open":"badge b-open" }[s] || "badge b-unk";
+}
+function badgeTxt(s) {
+  return { "Closing Soon":"Soon","Closing Mid":"Mid","Open":"Open" }[s] || "Unknown";
+}
+function cardEdgeCls(s) {
+  return { "Closing Soon":"soon","Closing Mid":"mid","Open":"open" }[s] || "";
+}
+
+/* FIX #6: pills only shown on collapsed groups — handled via CSS .group-header.open .g-pills */
+function groupPills(items) {
+  const has = x => items.some(i => i.status === x);
+  return '<div class="g-pills" aria-hidden="true">'
+    + (has('Closing Soon') ? '<span class="pill pill-soon">SOON</span>' : '')
+    + (has('Closing Mid')  ? '<span class="pill pill-mid">MID</span>'  : '')
+    + (has('Open')         ? '<span class="pill pill-open">OPEN</span>': '')
+    + '</div>';
+}
+
+/* ── Card HTML ── */
+function cardHTML(s) {
+  const dl = s.deadline
+    ? `<div class="card-dl">deadline ${escapeHTML(s.deadline)}</div>`
+    : '';
+
+  const levelVal  = s.level || 'Multiple / Unspecified';
+  const levelTag  = `<span class="tag tag-level">Level: ${escapeHTML(levelVal)}</span>`;
+
+  const fundVal  = s.funding_type || 'Unknown';
+  const fundMeta = FUNDING_META[fundVal] || FUNDING_META['Unknown'];
+  const fundTag  = `<span class="tag ${fundMeta.cls}">Funding ${escapeHTML(fundVal)}</span>`;
+
+  /* FIX #5: only show eligibility row when genuinely restricted */
+  const eligVal = s.eligible_countries || '';
+  const eligRow = isRestrictedEligibility(eligVal)
+    ? `<div class="card-elig-row">
+         <span class="card-elig-text">Eligible ${escapeHTML(eligVal)}</span>
+       </div>`
+    : '';
+
+  return `<div class="card ${cardEdgeCls(s.status)}">
+    <div class="card-head">
+      <div class="card-title">${escapeHTML(s.name)}</div>
+      <span class="${badgeCls(s.status)}">${badgeTxt(s.status)}</span>
+    </div>
+    <div class="card-tags">
+      ${levelTag}
+      ${fundTag}
+    </div>
+    <div class="card-info">
+      ${dl}
+    </div>
+    ${eligRow}
+    <a class="apply-link" href="${escapeHTML(s.link || '#')}" target="_blank" rel="noopener noreferrer">
+      Apply ↗
+    </a>
+  </div>`;
+}
+
+/* ── Pagination bar ── */
+function buildPagination(totalCards) {
+  const wrap = $('pagination-wrap');
+  /* FIX #2: was `perPage >` (syntax error) — correct comparison */
+  if (perPage === 0 || totalCards <= perPage) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+
+  const totalPages = Math.ceil(totalCards / perPage);
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * perPage + 1;
+  const end   = Math.min(currentPage * perPage, totalCards);
+
+  $('pagination-info').innerHTML =
+    `Showing <strong>${start}–${end}</strong> of <strong>${totalCards}</strong>`;
+
+  const range = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  let pages;
+  if (totalPages <= 7)                   pages = range(1, totalPages);
+  else if (currentPage <= 4)             pages = [...range(1, 5), '…', totalPages];
+  else if (currentPage >= totalPages-3)  pages = [1, '…', ...range(totalPages-4, totalPages)];
+  else pages = [1, '…', currentPage-1, currentPage, currentPage+1, '…', totalPages];
+
+  let btns = `<button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''} aria-label="Previous page">&#8592;</button>`;
+  pages.forEach(p => {
+    btns += p === '…'
+      ? `<span class="pg-ellipsis" aria-hidden="true">…</span>`
+      : `<button class="pg-btn${p===currentPage?' active':''}" onclick="goPage(${p})" aria-label="Page ${p}" ${p===currentPage?'aria-current="page"':''}>${p}</button>`;
+  });
+  btns += `<button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''} aria-label="Next page">&#8594;</button>`;
+  $('pagination-controls').innerHTML = btns;
+}
+
+/* ── Main render ── */
+function render() {
+  const q  = $('search').value.trim().toLowerCase();
+  const sf = $('sel-status').value;
+  const cf = $('sel-country').value;
+  const lf = $('sel-level').value;
+  const ff = $('sel-funding').value;
+
+  /* 1. Filter */
+  const filtered = DATA.filter(s =>
+    (!q  || (s.name||'').toLowerCase().includes(q) ||
+             (s.country||'').toLowerCase().includes(q) ||
+             (s.source||'').toLowerCase().includes(q) ||
+             (s.eligible_countries||'').toLowerCase().includes(q)) &&
+    (!sf || s.status === sf) &&
+    (!cf || s.country === cf) &&
+    (!lf || (s.level || 'Multiple / Unspecified') === lf) &&
+    (!ff || (s.funding_type || 'Unknown') === ff)
+  );
+
+  const total = filtered.length;
+
+  /* FIX #3: stats strip — show zero state instead of all-zero numbers */
+  if (total === 0) {
+    $('stats-strip').innerHTML = `<div class="stats-zero">No scholarships match the current filters.</div>`;
+  } else {
+    const ff_count = filtered.filter(s => (s.funding_type||'') === 'Fully Funded').length;
+    $('stats-strip').innerHTML = `
+      <div class="stat"><div class="stat-pip" style="background:var(--green)"></div><div class="stat-body"><div class="stat-n">${total}</div><div class="stat-l">Total</div></div></div>
+      <div class="stat"><div class="stat-pip" style="background:#888"></div><div class="stat-body"><div class="stat-n">${new Set(filtered.map(s=>s.country)).size}</div><div class="stat-l">Countries</div></div></div>
+      <div class="stat"><div class="stat-pip" style="background:var(--red)"></div><div class="stat-body"><div class="stat-n" style="color:var(--red)">${filtered.filter(s=>s.status==='Closing Soon').length}</div><div class="stat-l">Closing soon</div></div></div>
+      <div class="stat"><div class="stat-pip" style="background:var(--amber)"></div><div class="stat-body"><div class="stat-n" style="color:var(--amber)">${filtered.filter(s=>s.status==='Closing Mid').length}</div><div class="stat-l">Closing mid</div></div></div>
+      <div class="stat"><div class="stat-pip" style="background:var(--green)"></div><div class="stat-body"><div class="stat-n" style="color:var(--green)">${filtered.filter(s=>s.status==='Open').length}</div><div class="stat-l">Open</div></div></div>
+      <div class="stat"><div class="stat-pip" style="background:goldenrod"></div><div class="stat-body"><div class="stat-n" style="color:#7A6000">${ff_count}</div><div class="stat-l">Fully funded</div></div></div>
+    `;
+  }
+
+  /* 2. Group & sort within each country */
+  const groups = {};
+  filtered.forEach(s => (groups[s.country] = groups[s.country] || []).push(s));
+  Object.values(groups).forEach(arr =>
+    arr.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3))
+  );
+
+  /* 3. Sort country keys */
+  let countryKeys = Object.keys(groups);
+  if (sortMode === 'urgency') {
+    countryKeys.sort((a, b) => {
+      const oa = STATUS_ORDER[groups[a][0]?.status] ?? 3;
+      const ob = STATUS_ORDER[groups[b][0]?.status] ?? 3;
+      return oa !== ob ? oa - ob : groups[b].length - groups[a].length;
+    });
+  } else if (sortMode === 'az') {
+    countryKeys.sort();
+  } else {
+    countryKeys.sort((a, b) => groups[b].length - groups[a].length);
+  }
+
+  /* Ensure openGroups is initialized */
+  countryKeys.forEach(c => {
+    if (openGroups[c] === undefined) openGroups[c] = allOpen;
+  });
+
+  /* 4. Flat ordered list for pagination */
+  const allOrdered = countryKeys.flatMap(c => groups[c]);
+
+  /* 5. Paginate — FIX #2: correct comparison `perPage > 0` */
+  buildPagination(allOrdered.length);
+  const pageItems = perPage > 0
+    ? allOrdered.slice((currentPage - 1) * perPage, currentPage * perPage)
+    : allOrdered;
+
+  if (!pageItems.length) {
+    $('groups-container').innerHTML =
+      '<div class="empty-msg"><big>?</big>No scholarships match your filters.<br><button class="expand-all-btn" style="margin-top:12px" onclick="clearFilters()">Clear all filters</button></div>';
+    return;
+  }
+
+  /* 6. Re-group page items */
+  const pageGroups = {};
+  pageItems.forEach(s => (pageGroups[s.country] = pageGroups[s.country] || []).push(s));
+  const pageCountries = countryKeys.filter(c => pageGroups[c]);
+
+  /* 7. Render — FIX #10: group headers are keyboard-accessible buttons */
+  let html = '';
+  pageCountries.forEach(country => {
+    const items    = pageGroups[country];
+    const allItems = groups[country];
+    const isOpen   = openGroups[country];
+    const countLabel = items.length < allItems.length
+      ? `${items.length} of ${allItems.length}`
+      : `${allItems.length}`;
+
+    /* aria-expanded + role="button" + tabindex for full keyboard access */
+    html += `<div class="group">
+      <div
+        class="group-header${isOpen ? ' open' : ''}"
+        data-country="${escapeHTML(country)}"
+        role="button"
+        tabindex="0"
+        aria-expanded="${isOpen}"
+        aria-label="${escapeHTML(country)}, ${countLabel} scholarships"
+      >
+        <span class="g-name">${escapeHTML(country)}</span>
+        ${groupPills(allItems)}
+        <span class="g-count">${countLabel}</span>
+        <span class="g-arrow${isOpen ? ' open' : ''}" aria-hidden="true">&#9654;</span>
+      </div>`;
+    if (isOpen) {
+      html += '<div class="cards-grid">';
+      items.forEach(s => { html += cardHTML(s); });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+
+  $('groups-container').innerHTML = html;
+}
+
+/* ── Event delegation for group headers (click + keyboard) ── */
+$('groups-container').addEventListener('click', e => {
+  const header = e.target.closest('.group-header');
+  if (header) toggleGroup(header.dataset.country);
+});
+
+/* FIX #10: keyboard support for group headers */
+$('groups-container').addEventListener('keydown', e => {
+  const header = e.target.closest('.group-header');
+  if (header && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    toggleGroup(header.dataset.country);
+  }
+});
+
+/* ── Bind filter controls ── */
+function resetAndRender() {
+  currentPage = 1;
+  updateFilterBadge();
+  render();
+}
+
+$('search').addEventListener('input', debounce(resetAndRender, 150));
+
+/* ── Boot ── */
+loadData();
+</script>
+</body>
+</html> 
