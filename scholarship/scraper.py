@@ -1,0 +1,478 @@
+
+# CELL 1 - Install
+# !pip install -q requests beautifulsoup4 pandas python-dateutil lxml
+
+
+# CELL 2 - Imports and config
+import time
+import random
+import re
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from dateutil import parser as dateparse
+from IPython.display import display, HTML
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+NOW = datetime.now(timezone.utc)
+
+
+# CELL 3 - Field inference
+
+_LEVEL_PATTERNS = [
+    (re.compile(r"\bpostdoc(?:toral)?\b", re.I),                                              "Postdoctoral"),
+    (re.compile(r"\bph\.?d\.?\b|\bdoctoral?\b", re.I),                                       "PhD"),
+    (re.compile(r"\bmaster(?:s|'s)?\b|\bm\.?sc\.?\b|\bmba\b|\bpostgraduate\b", re.I),        "Masters"),
+    (re.compile(r"\bbachelor(?:s|'s)?\b|\bundergraduate?\b|\bb\.?sc\.?\b", re.I),            "Bachelors"),
+    (re.compile(r"\bshort\s+course\b|\btraining\b|\bcertificate\b|\bworkshop\b", re.I),      "Short Course"),
+    (re.compile(r"\bresearch\s+fellowship\b|\bresearch\s+grant\b", re.I),                     "Research Fellowship"),
+]
+
+_FULL_FUND = re.compile(
+    r"\bfully?\s*funded\b|\bfull\s+scholarship\b"
+    r"|\bcovers?\s+(?:all|full|tuition|living|airfare)\b"
+    r"|\ball\s+expenses?\s+(?:covered|paid|included)\b",
+    re.I,
+)
+_PARTIAL_FUND = re.compile(
+    r"\bpartial(?:ly)?\s*funded\b|\btuition\s+waiver\b|\bfee\s+waiver\b|\bstipend\s+only\b",
+    re.I,
+)
+
+_ELIGIBILITY = [
+    (re.compile(r"\bkenya(?:n)?\b", re.I),                                                   "Kenyan students"),
+    (re.compile(r"\bafric(?:a|an)\b", re.I),                                                 "African students"),
+    (re.compile(r"\bdeveloping\s+countr(?:y|ies)\b", re.I),                                  "Developing countries"),
+    (re.compile(r"\binternat(?:ional|ionally)\b|\ball\s+nationalities\b|\bworldwide\b", re.I),"International"),
+]
+
+
+def infer_level(text):
+    for pattern, label in _LEVEL_PATTERNS:
+        if pattern.search(text):
+            return label
+    return "Multiple / Unspecified"
+
+
+def infer_funding(text):
+    if _FULL_FUND.search(text):
+        return "Fully Funded"
+    if _PARTIAL_FUND.search(text):
+        return "Partial"
+    return "Unknown"
+
+
+def infer_eligible_countries(text):
+    for pattern, label in _ELIGIBILITY:
+        if pattern.search(text):
+            return label
+    return "International (check website)"
+
+
+def enrich(row, description=""):
+    text = f"{row.get('name', '')} {description}"
+    row["level"]               = infer_level(text)
+    row["funding_type"]        = infer_funding(text)
+    row["eligible_countries"]  = infer_eligible_countries(text)
+    return row
+
+
+# CELL 4 - Sources
+
+RSS_SOURCES = [
+    {
+        "name":    "Opportunity Desk",
+        "url":     "https://opportunitydesk.org/feed/",
+        "country": "Multiple",
+    },
+    {
+        "name":    "Scholars4Dev",
+        "url":     "https://www.scholars4dev.com/feed/",
+        "country": "Multiple",
+    },
+    {
+        "name":    "AfterSchoolAfrica - Australia Awards",
+        "url":     "https://www.afterschoolafrica.com/tag/australia-awards/feed/",
+        "country": "Australia",
+    },
+    {
+        "name":    "AfterSchoolAfrica - DAAD",
+        "url":     "https://www.afterschoolafrica.com/tag/daad/feed/",
+        "country": "Germany",
+    },
+    {
+        "name":    "Erasmus Mundus",
+        "url":     "https://www.eacea.ec.europa.eu/node/253/rss_en",
+        "country": "Europe",
+    },
+]
+
+
+# CELL 5 - Mastercard Foundation (hardcoded)
+
+MASTERCARD_PARTNERS = [
+    ("African Leadership University",               "Rwanda / Mauritius"),
+    ("African Institute for Mathematical Sciences", "Multiple African"),
+    ("Amref International University",              "Kenya"),
+    ("Arizona State University",                    "USA"),
+    ("Ashesi University",                           "Ghana"),
+    ("Carnegie Mellon University Africa",           "Rwanda"),
+    ("EARTH University",                            "Costa Rica"),
+    ("Institut Polytechnique de Paris",             "France"),
+    ("Kwame Nkrumah University of Science & Tech",  "Ghana"),
+    ("Makerere University",                         "Uganda"),
+    ("McGill University",                           "Canada"),
+    ("Sciences Po",                                 "France"),
+    ("Strathmore University",                       "Kenya"),
+    ("University of British Columbia",              "Canada"),
+    ("University of California Berkeley",           "USA"),
+    ("University of Cambridge",                     "UK"),
+    ("University of Cape Town",                     "South Africa"),
+    ("University of Edinburgh",                     "UK"),
+    ("University of Ghana",                         "Ghana"),
+    ("University of Ibadan",                        "Nigeria"),
+    ("University of Pretoria",                      "South Africa"),
+    ("University of Toronto",                       "Canada"),
+    ("University of Waterloo",                      "Canada"),
+]
+
+MCF_URL = (
+    "https://mastercardfdn.org/en/what-we-do/our-programs/"
+    "mastercard-foundation-scholars-program/where-to-apply/"
+)
+
+def mastercard_rows():
+    return [
+        {
+            "name":               f"Mastercard Foundation Scholars Program - {uni}",
+            "country":            country,
+            "source":             "Mastercard Foundation",
+            "date":               "",
+            "deadline":           "",
+            "status":             "Unknown",
+            "link":               MCF_URL,
+            "level":              "Bachelors; Masters",
+            "funding_type":       "Fully Funded",
+            "eligible_countries": "African students (check partner university)",
+        }
+        for uni, country in MASTERCARD_PARTNERS
+    ]
+
+
+# CELL 6 - Helpers
+
+def get_soup(url, parser="xml"):
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        return BeautifulSoup(r.text, parser)
+    except Exception as e:
+        print(f"  Failed: {url} -> {e}")
+        return None
+
+
+_DEADLINE_RE = re.compile(
+    r"(?:deadline|closing\s+date|due\s*date)\s*[:\-]?\s*([A-Za-z0-9 ,/\-.]+)",
+    re.I,
+)
+
+def extract_deadline(text):
+    """Try to parse a deadline date from free text. Returns ISO string or ''."""
+    if not text:
+        return ""
+    plain = re.sub(r"<[^>]+>", " ", text)
+    m = _DEADLINE_RE.search(plain)
+    if not m:
+        return ""
+    try:
+        return dateparse.parse(m.group(1).strip()[:40], fuzzy=True).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
+def deadline_status(iso_date):
+    if not iso_date:
+        return "Unknown"
+    try:
+        dt = datetime.strptime(iso_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        days = (dt - NOW).days
+        if days < 0:   return "Closed"
+        if days <= 14: return "Closing Soon"
+        if days <= 30: return "Closing Mid"
+        return "Open"
+    except Exception:
+        return "Unknown"
+
+
+# Known aggregator domains whose article pages we should look through
+# to find the real program URL.
+_AGGREGATOR_DOMAINS = {
+    "opportunitydesk.org",
+    "scholars4dev.com",
+    "afterschoolafrica.com",
+    "eacea.ec.europa.eu",
+}
+
+# Domains that are never a legitimate program destination.
+# Any link pointing to these is skipped in both passes.
+_SKIP_DOMAINS = {
+    "facebook.com", "twitter.com", "x.com", "instagram.com",
+    "linkedin.com", "youtube.com", "tiktok.com",
+    "whatsapp.com", "t.me", "telegram.me", "telegram.org",
+    "reddit.com", "pinterest.com",
+    "google.com", "google.co.ke",
+    "paypal.com", "bit.ly", "tinyurl.com",
+    "yocket.com", "afterschoolafrica.com", "opportunitydesk.org",
+    "scholars4dev.com", "eacea.ec.europa.eu",
+}
+
+# Anchor text patterns that strongly suggest an official program link.
+_PROGRAM_LINK_RE = re.compile(
+    r"\b(apply\s+(here|now)|official\s+(website|page|link)|"
+    r"click\s+here\s+to\s+apply|programme?\s+(website|page)|"
+    r"more\s+information|visit\s+(website|page)|learn\s+more)\b",
+    re.I,
+)
+
+# Domains that are credible program hosts — used to filter pass 2.
+# Extend this list as you encounter legitimate hosts.
+_PROGRAM_DOMAINS = re.compile(
+    r"(\.edu|\.ac\.|\.gov|\.org|daad\.de|chevening\.org|"
+    r"commonwealthscholarships|mastercardfdn|scholarships\.gov\.au|"
+    r"erasmusplus|eacea|fulbright|aga-khan|worldbank|afdb\.org|"
+    r"britishcouncil|idrc\.ca|gates|rockefeller|ford|carnegie|"
+    r"soros|macfound|hewlett|mellon|nuffield|wellcome|"
+    r"un\.org|undp|unicef|unesco|unfccc|who\.int|ilo\.org|"
+    r"ausaid|dfat\.gov\.au|giz\.de|usaid\.gov|dfid|fcdo\.gov\.uk)",
+    re.I,
+)
+
+
+def fetch_program_url(article_url):
+    """
+    Visit an aggregator article page and return the real program/apply URL.
+    Falls back to the article URL if nothing credible is found.
+
+    Pass 1: anchor whose visible text matches apply/official language,
+            pointing to any non-skipped external domain.
+    Pass 2: first external link whose domain matches _PROGRAM_DOMAINS.
+    Fallback: return the original article URL unchanged.
+    """
+    from urllib.parse import urlparse
+
+    domain = urlparse(article_url).netloc.replace("www.", "")
+    if domain not in _AGGREGATOR_DOMAINS:
+        return article_url
+
+    soup = get_soup(article_url, parser="lxml")
+    if not soup:
+        return article_url
+
+    def is_skip(href):
+        parsed = urlparse(href)
+        d = parsed.netloc.replace("www.", "")
+        return (
+            parsed.scheme not in ("http", "https")
+            or not parsed.netloc
+            or d in _SKIP_DOMAINS
+            or parsed.fragment  # pure anchor links like #section
+        )
+
+    anchors = soup.find_all("a", href=True)
+
+    # Pass 1: text strongly suggests an apply/official link
+    for a in anchors:
+        href = a["href"].strip()
+        if is_skip(href):
+            continue
+        if _PROGRAM_LINK_RE.search(a.get_text(strip=True)):
+            return href
+
+    # Pass 2: first link whose domain looks like a credible program host
+    for a in anchors:
+        href = a["href"].strip()
+        if is_skip(href):
+            continue
+        if _PROGRAM_DOMAINS.search(href):
+            return href
+
+    # Nothing credible found — keep the aggregator article URL
+    return article_url
+
+
+# CELL 7 - Scraper
+
+def scrape_rss(source):
+    rows = []
+    soup = get_soup(source["url"])
+    if not soup:
+        return rows
+
+    items = soup.select("item")
+    if not items:
+        print(f"  [{source['name']}] no items found")
+        return rows
+
+    for item in items:
+        name_el = item.select_one("title")
+        name = name_el.get_text(strip=True) if name_el else ""
+        if not name:
+            continue
+
+        # <link> in RSS is a text node, not an attribute
+        link_el = item.select_one("link")
+        article_url = ""
+        if link_el:
+            article_url = (link_el.get_text(strip=True)
+                           or str(link_el.next_sibling or "")).strip()
+
+        desc_el = item.select_one("description") or item.select_one("encoded")
+        description = desc_el.get_text(strip=True) if desc_el else ""
+
+        pub_el = item.select_one("pubDate")
+        pub_date = pub_el.get_text(strip=True) if pub_el else ""
+        deadline = extract_deadline(description)
+
+        st = deadline_status(deadline)
+        if st == "Closed":
+            continue
+
+        # Resolve the real program URL from the aggregator article page
+        program_url = fetch_program_url(article_url) if article_url else source["url"]
+        time.sleep(random.uniform(1.0, 2.0))   # polite delay per article fetch
+
+        row = {
+            "name":         name,
+            "country":      source["country"],
+            "source":       source["name"],
+            "date":         pub_date,
+            "deadline":     deadline,
+            "status":       st,
+            "article_url":  article_url,          # aggregator page (for reference)
+            "link":         program_url,           # actual program/apply URL
+        }
+        row = enrich(row, description)
+        rows.append(row)
+
+    print(f"  [{source['name']}] {len(rows)} items")
+    return rows
+
+
+# CELL 8 - Deduplicate
+
+def deduplicate(df):
+    if df.empty:
+        return df
+    norm = (
+        df["name"]
+        .str.lower()
+        .str.replace(r"[^\w\s]", "", regex=True)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+    return df[~norm.duplicated(keep="first")].reset_index(drop=True)
+
+
+# CELL 9 - Run
+
+all_rows = []
+
+for src in RSS_SOURCES:
+    print(f"\n> {src['name']}")
+    all_rows.extend(scrape_rss(src))
+    time.sleep(random.uniform(1.5, 3.0))
+
+print(f"\n> Mastercard Foundation (hardcoded)")
+mcf = mastercard_rows()
+all_rows.extend(mcf)
+print(f"  {len(mcf)} rows added")
+
+df = pd.DataFrame(all_rows) if all_rows else pd.DataFrame()
+
+before = len(df)
+df = deduplicate(df)
+print(f"\nDeduplication: {before} -> {len(df)} rows ({before - len(df)} removed)")
+print(f"Total: {len(df)} scholarships")
+
+
+# CELL 10 - Display
+
+STATUS_COLORS = {
+    "Closing Soon": "#FF4C4C",
+    "Closing Mid":  "#FF9900",
+    "Open":         "#2ECC40",
+    "Closed":       "#AAAAAA",
+    "Unknown":      "#DDDDDD",
+}
+
+if df.empty:
+    print("No data to display.")
+else:
+    cs = (df["status"] == "Closing Soon").sum()
+    cm = (df["status"] == "Closing Mid").sum()
+    op = (df["status"] == "Open").sum()
+    ff = (df.get("funding_type", pd.Series()) == "Fully Funded").sum()
+
+    display(HTML(f"""
+    <div style="background:#003366;color:white;padding:14px 20px;border-radius:6px;font-family:sans-serif">
+      <h2 style="margin:0">Scholarships for Kenyan Students - {NOW.strftime('%Y-%m-%d')}</h2>
+      <p style="margin:6px 0 0">
+        <b>{len(df)}</b> total |
+        <b style="color:#FF4C4C">{cs}</b> Closing Soon |
+        <b style="color:#FF9900">{cm}</b> Closing Mid |
+        <b style="color:#2ECC40">{op}</b> Open |
+        <b style="color:#FFD700">{ff}</b> Fully Funded
+      </p>
+    </div>"""))
+
+    STATUS_ORDER = {"Closing Soon": 0, "Closing Mid": 1, "Open": 2, "Unknown": 3, "Closed": 4}
+    df["_ord"] = df["status"].map(STATUS_ORDER).fillna(5)
+    df.sort_values("_ord", inplace=True)
+    df.drop(columns="_ord", inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    display(
+        df[[
+            "name", "country", "level", "funding_type",
+            "eligible_countries", "status", "deadline", "source", "article_url", "link"
+        ]].style
+        .apply(lambda r: [f"background:{STATUS_COLORS.get(r['status'], '#fff')}22"] * len(r), axis=1)
+        .format({
+            "link":        lambda u: f'<a href="{u}" target="_blank">Apply</a>' if u else "",
+            "article_url": lambda u: f'<a href="{u}" target="_blank">Article</a>' if u else "",
+        })
+        .set_table_styles([
+            {"selector": "th", "props": [("background", "#003366"), ("color", "white"), ("padding", "8px 12px")]},
+            {"selector": "td", "props": [("padding", "6px 10px"), ("font-size", "12px")]},
+        ])
+        .hide(axis="index")
+    )
+
+    print("\n-- Level breakdown --")
+    print(df["level"].value_counts().to_string())
+
+    print("\n-- Funding type breakdown --")
+    print(df["funding_type"].value_counts().to_string())
+
+
+# CELL 11 - Export
+
+if not df.empty:
+    #ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_path  = f"scholarships.csv"
+    json_path = f"scholarships.json"
+    df.to_csv(csv_path, index=False)
+    df.to_json(json_path, orient="records", indent=2)
+    print(f"\nSaved: {csv_path} | {json_path}")
+    print(f"Columns: {list(df.columns)}")
