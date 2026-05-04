@@ -464,11 +464,6 @@ else:
 # CELL 11 - Export
 
 if not df.empty:
-    #ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    #csv_path  = f"scholarships.csv"
-    #json_path = f"scholarships.json"
-    #df.to_csv(csv_path, index=False)
-    #df.to_json(json_path, orient="records", indent=2)
     output_path = "scholarship/scholarship.json"
     with open(output_path, "w") as f:
     json.dump(data, f, indent=2)
