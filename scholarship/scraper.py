@@ -1,9 +1,4 @@
 
-# CELL 1 - Install
-#!pip install -q requests beautifulsoup4 pandas python-dateutil lxml
-
-
-# CELL 2 - Imports and config
 import time
 import random
 import re
