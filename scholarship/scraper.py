@@ -431,6 +431,7 @@ else:
 
 if not df.empty:
     output_path = "scholarship/scholarship.json"
+    data = df.to_dict(orient="records") 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2)
    
