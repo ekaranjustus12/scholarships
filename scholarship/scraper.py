@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from dateutil import parser as dateparse
-from IPython.display import display, HTML
+#from IPython.display import display, HTML
 
 HEADERS = {
     "User-Agent": (
@@ -419,7 +419,7 @@ else:
     op = (df["status"] == "Open").sum()
     ff = (df.get("funding_type", pd.Series()) == "Fully Funded").sum()
 
-    display(HTML(f"""
+    '''display(HTML(f"""
     <div style="background:#003366;color:white;padding:14px 20px;border-radius:6px;font-family:sans-serif">
       <h2 style="margin:0">Scholarships for Kenyan Students - {NOW.strftime('%Y-%m-%d')}</h2>
       <p style="margin:6px 0 0">
@@ -429,7 +429,7 @@ else:
         <b style="color:#2ECC40">{op}</b> Open |
         <b style="color:#FFD700">{ff}</b> Fully Funded
       </p>
-    </div>"""))
+    </div>"""))'''
 
     STATUS_ORDER = {"Closing Soon": 0, "Closing Mid": 1, "Open": 2, "Unknown": 3, "Closed": 4}
     df["_ord"] = df["status"].map(STATUS_ORDER).fillna(5)
@@ -437,7 +437,7 @@ else:
     df.drop(columns="_ord", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
-    display(
+   ''' display(
         df[[
             "name", "country", "level", "funding_type",
             "eligible_countries", "status", "deadline", "source", "article_url", "link"
@@ -458,7 +458,7 @@ else:
     print(df["level"].value_counts().to_string())
 
     print("\n-- Funding type breakdown --")
-    print(df["funding_type"].value_counts().to_string())
+    print(df["funding_type"].value_counts().to_string())'''
 
 
 # CELL 11 - Export
