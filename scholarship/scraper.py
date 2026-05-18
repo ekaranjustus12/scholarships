@@ -152,10 +152,6 @@ HTML_SOURCES = [
     },
 ]
 
-MCF_URL = (
-    "https://mastercardfdn.org/en/what-we-do/our-programs/"
-    "mastercard-foundation-scholars-program/where-to-apply/"
-)
 
 
 def get_soup(url, parser="xml"):
@@ -448,11 +444,10 @@ for src in RSS_SOURCES:
     all_rows.extend(scrape_rss(src))
     time.sleep(random.uniform(1.5, 3.0))
 
-print(f"\n> Mastercard Foundation (hardcoded)")
-mcf = mastercard_rows()
-all_rows.extend(mcf)
-print(f"  {len(mcf)} rows added")
-
+for src in HTML_SOURCES:
+    print(f"\n> {src['name']}")
+    all_rows.extend(scrape_html(src))
+    time.sleep(random.uniform(1.5, 3.0))
 df = pd.DataFrame(all_rows) if all_rows else pd.DataFrame()
 
 before = len(df)
