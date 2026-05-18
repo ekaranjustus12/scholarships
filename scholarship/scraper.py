@@ -23,7 +23,6 @@ HEADERS = {
 NOW = datetime.now(timezone.utc)
 
 
-# CELL 3 - Field inference
 
 _LEVEL_PATTERNS = [
     (re.compile(r"\bpostdoc(?:toral)?\b", re.I),                                              "Postdoctoral"),
@@ -83,8 +82,6 @@ def enrich(row, description=""):
     return row
 
 
-# CELL 4 - Sources
-
 RSS_SOURCES = [
     {
         "name":    "Opportunity Desk",
@@ -98,7 +95,7 @@ RSS_SOURCES = [
     },
     {
         "name":    "AfterSchoolAfrica - Australia Awards",
-        "url":     "https://www.afterschoolafrica.com/tag/australia-awards/feed/",
+        "url":     "https://www.afterschoolafrica.com/tag/australia/feed/",
         "country": "Australia",
     },
     {
@@ -111,35 +108,48 @@ RSS_SOURCES = [
         "url":     "https://www.eacea.ec.europa.eu/node/253/rss_en",
         "country": "Europe",
     },
+    {
+        "name":    "GlobalSouthOpportunities",
+        "url":     "https://www.globalsouthopportunities.com/category/scholarships/feed/",
+        "country": "Multiple",
+    },
 ]
-
-
-# CELL 5 - Mastercard Foundation (hardcoded)
-
-MASTERCARD_PARTNERS = [
-    ("African Leadership University",               "Rwanda / Mauritius"),
-    ("African Institute for Mathematical Sciences", "Multiple African"),
-    ("Amref International University",              "Kenya"),
-    ("Arizona State University",                    "USA"),
-    ("Ashesi University",                           "Ghana"),
-    ("Carnegie Mellon University Africa",           "Rwanda"),
-    ("EARTH University",                            "Costa Rica"),
-    ("Institut Polytechnique de Paris",             "France"),
-    ("Kwame Nkrumah University of Science & Tech",  "Ghana"),
-    ("Makerere University",                         "Uganda"),
-    ("McGill University",                           "Canada"),
-    ("Sciences Po",                                 "France"),
-    ("Strathmore University",                       "Kenya"),
-    ("University of British Columbia",              "Canada"),
-    ("University of California Berkeley",           "USA"),
-    ("University of Cambridge",                     "UK"),
-    ("University of Cape Town",                     "South Africa"),
-    ("University of Edinburgh",                     "UK"),
-    ("University of Ghana",                         "Ghana"),
-    ("University of Ibadan",                        "Nigeria"),
-    ("University of Pretoria",                      "South Africa"),
-    ("University of Toronto",                       "Canada"),
-    ("University of Waterloo",                      "Canada"),
+HTML_SOURCES = [
+    {
+        "name":    "AfterSchoolAfrica - USA",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/usa/",
+        "country": "USA",
+    },
+    {
+        "name":    "AfterSchoolAfrica - UK",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/uk/",
+        "country": "UK",
+    },
+    {
+        "name":    "AfterSchoolAfrica - China",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/scholarship-in-china/",  # ← fixed
+        "country": "China",
+    },
+    {
+        "name":    "AfterSchoolAfrica - Japan",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/scholarship-in-japan/",  # ← fixed
+        "country": "Japan",
+    },
+    {
+        "name":    "AfterSchoolAfrica - Canada",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/scholarship-in-canada/",  # ← fixed
+        "country": "Canada",
+    },
+    {
+        "name":    "AfterSchoolAfrica - South Africa",
+        "url":     "https://www.afterschoolafrica.com/tag/scholarship-in-south-africa/",  # ← tag URL, not by-country
+        "country": "South Africa",
+    },
+    {
+        "name":    "AfterSchoolAfrica - Italy",
+        "url":     "https://www.afterschoolafrica.com/scholarship/by-country/scholarship-in-italy/",  # ← fixed
+        "country": "Italy",
+    },
 ]
 
 MCF_URL = (
@@ -147,25 +157,6 @@ MCF_URL = (
     "mastercard-foundation-scholars-program/where-to-apply/"
 )
 
-def mastercard_rows():
-    return [
-        {
-            "name":               f"Mastercard Foundation Scholars Program - {uni}",
-            "country":            country,
-            "source":             "Mastercard Foundation",
-            "date":               "",
-            "deadline":           "",
-            "status":             "Unknown",
-            "link":               MCF_URL,
-            "level":              "Bachelors; Masters",
-            "funding_type":       "Fully Funded",
-            "eligible_countries": "African students (check partner university)",
-        }
-        for uni, country in MASTERCARD_PARTNERS
-    ]
-
-
-# CELL 6 - Helpers
 
 def get_soup(url, parser="xml"):
     try:
@@ -361,6 +352,75 @@ def scrape_rss(source):
         rows.append(row)
 
     print(f"  [{source['name']}] {len(rows)} items")
+    return rows
+
+def scrape_html(source, max_pages=3):
+    rows = []
+    base_url = source["url"].rstrip("/") + "/"
+    is_tag_url = "/tag/" in base_url  # tag archives paginate differently
+
+    for page in range(1, max_pages + 1):
+        if page == 1:
+            url = base_url
+        elif is_tag_url:
+            url = f"{base_url}?paged={page}"   # /tag/.../?paged=2
+        else:
+            url = f"{base_url}page/{page}/"    # /scholarship/.../page/2/
+
+        soup = get_soup(url, parser="lxml")
+        if not soup:
+            break
+
+        title_links = soup.select("h2 a[href*='afterschoolafrica.com']")
+
+        if not title_links:
+            print(f"  [{source['name']}] page {page}: no items found, stopping")
+            break
+
+        page_rows = 0
+        for title_el in title_links:
+            name = title_el.get_text(strip=True)
+            article_url = title_el.get("href", "").strip()
+            if not name or not article_url:
+                continue
+
+            parent = title_el.find_parent(["div", "section", "article", "li"])
+            description = parent.get_text(strip=True) if parent else ""
+
+            date_el = parent.find("time") if parent else None
+            pub_date = ""
+            if date_el:
+                pub_date = date_el.get("datetime", "") or date_el.get_text(strip=True)
+
+            deadline = extract_deadline(description)
+            st = deadline_status(deadline)
+            if st == "Closed":
+                continue
+
+            program_url = fetch_program_url(article_url) if article_url else source["url"]
+            time.sleep(random.uniform(1.0, 2.0))
+
+            row = {
+                "name":        name,
+                "country":     source["country"],
+                "source":      source["name"],
+                "date":        pub_date,
+                "deadline":    deadline,
+                "status":      st,
+                "article_url": article_url,
+                "link":        program_url,
+            }
+            row = enrich(row, description)
+            rows.append(row)
+            page_rows += 1
+
+        print(f"  [{source['name']}] page {page}: {page_rows} items")
+
+        if len(title_links) < 4:
+            break
+
+        time.sleep(random.uniform(1.5, 3.0))
+
     return rows
 
 
