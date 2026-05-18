@@ -454,30 +454,6 @@ df = deduplicate(df)
 print(f"\nDeduplication: {before} -> {len(df)} rows ({before - len(df)} removed)")
 print(f"Total: {len(df)} scholarships")
 
-
-# CELL 10 - Display
-STATUS_COLORS = {
-    "Closing Soon": "#FF4C4C",
-    "Closing Mid":  "#FF9900",
-    "Open":         "#2ECC40",
-    "Closed":       "#AAAAAA",
-    "Unknown":      "#DDDDDD",
-}
-
-if df.empty:
-    print("No data to display.")
-else:
-    cs = (df["status"] == "Closing Soon").sum()
-    cm = (df["status"] == "Closing Mid").sum()
-    op = (df["status"] == "Open").sum()
-    ff = (df.get("funding_type", pd.Series()) == "Fully Funded").sum()
-
-    STATUS_ORDER = {"Closing Soon": 0, "Closing Mid": 1, "Open": 2, "Unknown": 3, "Closed": 4}
-    df["_ord"] = df["status"].map(STATUS_ORDER).fillna(5)
-    df.sort_values("_ord", inplace=True)
-    df.drop(columns="_ord", inplace=True)
-    df.reset_index(drop=True, inplace=True)
-
 if not df.empty:
     output_path = "scholarship/scholarships.json"
     data = df.to_dict(orient="records") 
