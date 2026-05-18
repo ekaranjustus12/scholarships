@@ -4,7 +4,6 @@ import random
 import re
 from datetime import datetime, timezone
 from urllib.parse import urljoin
-
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -19,11 +18,7 @@ HEADERS = {
     ),
     "Accept-Language": "en-US,en;q=0.9",
 }
-
 NOW = datetime.now(timezone.utc)
-
-
-
 _LEVEL_PATTERNS = [
     (re.compile(r"\bpostdoc(?:toral)?\b", re.I),                                              "Postdoctoral"),
     (re.compile(r"\bph\.?d\.?\b|\bdoctoral?\b", re.I),                                       "PhD"),
@@ -66,13 +61,11 @@ def infer_funding(text):
         return "Partial"
     return "Unknown"
 
-
 def infer_eligible_countries(text):
     for pattern, label in _ELIGIBILITY:
         if pattern.search(text):
             return label
     return "International (check website)"
-
 
 def enrich(row, description=""):
     text = f"{row.get('name', '')} {description}"
@@ -80,8 +73,7 @@ def enrich(row, description=""):
     row["funding_type"]        = infer_funding(text)
     row["eligible_countries"]  = infer_eligible_countries(text)
     return row
-
-
+#rss sources
 RSS_SOURCES = [
     {
         "name":    "Opportunity Desk",
@@ -114,6 +106,7 @@ RSS_SOURCES = [
         "country": "Multiple",
     },
 ]
+#html sources
 HTML_SOURCES = [
     {
         "name":    "AfterSchoolAfrica - USA",
@@ -151,7 +144,6 @@ HTML_SOURCES = [
         "country": "Italy",
     },
 ]
-
 
 
 def get_soup(url, parser="xml"):
@@ -197,8 +189,7 @@ def deadline_status(iso_date):
         return "Unknown"
 
 
-# Known aggregator domains whose article pages we should look through
-# to find the real program URL.
+# Known aggregator domains 
 _AGGREGATOR_DOMAINS = {
     "opportunitydesk.org",
     "scholars4dev.com",
@@ -206,8 +197,8 @@ _AGGREGATOR_DOMAINS = {
     "eacea.ec.europa.eu",
 }
 
-# Domains that are never a legitimate program destination.
-# Any link pointing to these is skipped in both passes.
+
+# link that is skipped
 _SKIP_DOMAINS = {
     "facebook.com", "twitter.com", "x.com", "instagram.com",
     "linkedin.com", "youtube.com", "tiktok.com",
@@ -217,6 +208,7 @@ _SKIP_DOMAINS = {
     "paypal.com", "bit.ly", "tinyurl.com",
     "yocket.com", "afterschoolafrica.com", "opportunitydesk.org",
     "scholars4dev.com", "eacea.ec.europa.eu",
+
 }
 
 # Anchor text patterns that strongly suggest an official program link.
@@ -227,8 +219,7 @@ _PROGRAM_LINK_RE = re.compile(
     re.I,
 )
 
-# Domains that are credible program hosts — used to filter pass 2.
-# Extend this list as you encounter legitimate hosts.
+# credible program hosts 
 _PROGRAM_DOMAINS = re.compile(
     r"(\.edu|\.ac\.|\.gov|\.org|daad\.de|chevening\.org|"
     r"commonwealthscholarships|mastercardfdn|scholarships\.gov\.au|"
@@ -239,28 +230,14 @@ _PROGRAM_DOMAINS = re.compile(
     r"ausaid|dfat\.gov\.au|giz\.de|usaid\.gov|dfid|fcdo\.gov\.uk)",
     re.I,
 )
-
-
 def fetch_program_url(article_url):
-    """
-    Visit an aggregator article page and return the real program/apply URL.
-    Falls back to the article URL if nothing credible is found.
-
-    Pass 1: anchor whose visible text matches apply/official language,
-            pointing to any non-skipped external domain.
-    Pass 2: first external link whose domain matches _PROGRAM_DOMAINS.
-    Fallback: return the original article URL unchanged.
-    """
     from urllib.parse import urlparse
-
     domain = urlparse(article_url).netloc.replace("www.", "")
     if domain not in _AGGREGATOR_DOMAINS:
         return article_url
-
     soup = get_soup(article_url, parser="lxml")
     if not soup:
         return article_url
-
     def is_skip(href):
         parsed = urlparse(href)
         d = parsed.netloc.replace("www.", "")
@@ -272,8 +249,7 @@ def fetch_program_url(article_url):
         )
 
     anchors = soup.find_all("a", href=True)
-
-    # Pass 1: text strongly suggests an apply/official link
+    # Pass 1: text that strongly suggests an apply/official link
     for a in anchors:
         href = a["href"].strip()
         if is_skip(href):
@@ -291,10 +267,7 @@ def fetch_program_url(article_url):
 
     # Nothing credible found — keep the aggregator article URL
     return article_url
-
-
-# CELL 7 - Scraper
-
+#scrape rss feeds
 def scrape_rss(source):
     rows = []
     soup = get_soup(source["url"])
@@ -349,7 +322,7 @@ def scrape_rss(source):
 
     print(f"  [{source['name']}] {len(rows)} items")
     return rows
-
+#scrape html pages
 def scrape_html(source, max_pages=3):
     rows = []
     base_url = source["url"].rstrip("/") + "/"
@@ -392,10 +365,8 @@ def scrape_html(source, max_pages=3):
             st = deadline_status(deadline)
             if st == "Closed":
                 continue
-
             program_url = fetch_program_url(article_url) if article_url else source["url"]
             time.sleep(random.uniform(1.0, 2.0))
-
             row = {
                 "name":        name,
                 "country":     source["country"],
@@ -418,9 +389,7 @@ def scrape_html(source, max_pages=3):
         time.sleep(random.uniform(1.5, 3.0))
 
     return rows
-
-
-# CELL 8 - Deduplicate
+#  Deduplicate
 
 def deduplicate(df):
     if df.empty:
@@ -434,9 +403,6 @@ def deduplicate(df):
     )
     return df[~norm.duplicated(keep="first")].reset_index(drop=True)
 
-
-# CELL 9 - Run
-
 all_rows = []
 
 for src in RSS_SOURCES:
@@ -448,15 +414,12 @@ for src in HTML_SOURCES:
     print(f"\n> {src['name']}")
     all_rows.extend(scrape_html(src))
     time.sleep(random.uniform(1.5, 3.0))
-df = pd.DataFrame(all_rows) if all_rows else pd.DataFrame()
 
+df = pd.DataFrame(all_rows) if all_rows else pd.DataFrame()
 before = len(df)
 df = deduplicate(df)
 print(f"\nDeduplication: {before} -> {len(df)} rows ({before - len(df)} removed)")
 print(f"Total: {len(df)} scholarships")
-
-
-# CELL 10 - Display
 
 STATUS_COLORS = {
     "Closing Soon": "#FF4C4C",
@@ -480,9 +443,6 @@ else:
     df.sort_values("_ord", inplace=True)
     df.drop(columns="_ord", inplace=True)
     df.reset_index(drop=True, inplace=True)
-
-   
-# CELL 11 - Export
 
 if not df.empty:
     output_path = "scholarship/scholarships.json"
