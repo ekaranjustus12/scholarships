@@ -23,10 +23,14 @@ HEADERS = {
     ),
     "Accept-Language": "en-US,en;q=0.9",
 }
+
 NOW = datetime.now(timezone.utc)
 
 # Toggle deep-link resolution (set to "false" in GitHub Actions to avoid rate-limits)
 RESOLVE_DEEP_LINKS = os.getenv("RESOLVE_DEEP_LINKS", "true").lower() == "true"
+
+
+# CELL 3 - Field inference
 
 _LEVEL_PATTERNS = [
     (re.compile(r"\bpostdoc(?:toral)?\b", re.I),                                              "Postdoctoral"),
@@ -70,11 +74,13 @@ def infer_funding(text):
         return "Partial"
     return "Unknown"
 
+
 def infer_eligible_countries(text):
     for pattern, label in _ELIGIBILITY:
         if pattern.search(text):
             return label
     return "International (check website)"
+
 
 def enrich(row, description=""):
     text = f"{row.get('name', '')} {description}"
@@ -82,7 +88,10 @@ def enrich(row, description=""):
     row["funding_type"]        = infer_funding(text)
     row["eligible_countries"]  = infer_eligible_countries(text)
     return row
-#rss sources
+
+
+# CELL 4 - Sources
+
 RSS_SOURCES = [
     {
         "name":    "Opportunity Desk",
