@@ -30,7 +30,18 @@ jobs:
           pip install -r scholarship/requirements.txt
 
       - name: Run scraper
+        env:
+          RESOLVE_DEEP_LINKS: "false"   # <-- disables deep-link resolution to avoid rate-limits
+          PYTHONUNBUFFERED: "1"         # <-- ensures logs appear immediately in GitHub UI
         run: python scholarship/scraper.py
+
+      - name: Verify output
+        run: |
+          if [ ! -f scholarship/scholarships.json ]; then
+            echo "::error::Output file not found!"
+            exit 1
+          fi
+          echo "Scholarships collected: $(python -c "import json; print(len(json.load(open('scholarship/scholarships.json'))))")"
 
       - name: Commit updated JSON
         run: |
