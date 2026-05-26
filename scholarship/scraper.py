@@ -2,9 +2,14 @@ import json
 import time
 import random
 import re
+import os
+import pathlib
 from datetime import datetime, timezone
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
+
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 import pandas as pd
 from dateutil import parser as dateparse
@@ -19,6 +24,10 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 NOW = datetime.now(timezone.utc)
+
+# Toggle deep-link resolution (set to "false" in GitHub Actions to avoid rate-limits)
+RESOLVE_DEEP_LINKS = os.getenv("RESOLVE_DEEP_LINKS", "true").lower() == "true"
+
 _LEVEL_PATTERNS = [
     (re.compile(r"\bpostdoc(?:toral)?\b", re.I),                                              "Postdoctoral"),
     (re.compile(r"\bph\.?d\.?\b|\bdoctoral?\b", re.I),                                       "PhD"),
@@ -154,13 +163,28 @@ MCF_URL = (
 
 # CELL 6 - Helpers
 
+def get_session():
+    session = requests.Session()
+    retries = Retry(
+        total=3,
+        backoff_factor=2,      # waits 2s, 4s, 8s between retries
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"]
+    )
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    session.mount("http://", HTTPAdapter(max_retries=retries))
+    session.headers.update(HEADERS)
+    return session
+
+SESSION = get_session()
+
 def get_soup(url, parser="xml"):
     try:
-        r = requests.get(url, headers=HEADERS, timeout=30)
+        r = SESSION.get(url, timeout=30)
         r.raise_for_status()
         return BeautifulSoup(r.text, parser)
     except Exception as e:
-        print(f"  Failed: {url} -> {e}")
+        print(f"  [ERROR] {url} -> {e}")
         return None
 
 
@@ -252,7 +276,6 @@ def fetch_program_url(article_url):
     Pass 2: first external link whose domain matches _PROGRAM_DOMAINS.
     Fallback: return the original article URL unchanged.
     """
-    from urllib.parse import urlparse
 
     domain = urlparse(article_url).netloc.replace("www.", "")
     if domain not in _AGGREGATOR_DOMAINS:
@@ -269,7 +292,6 @@ def fetch_program_url(article_url):
             parsed.scheme not in ("http", "https")
             or not parsed.netloc
             or d in _SKIP_DOMAINS
-            or parsed.fragment  # pure anchor links like #section
         )
 
     anchors = soup.find_all("a", href=True)
@@ -332,8 +354,11 @@ def scrape_rss(source):
             continue
 
         # Resolve the real program URL from the aggregator article page
-        program_url = fetch_program_url(article_url) if article_url else source["url"]
-        time.sleep(random.uniform(1.0, 2.0))   # polite delay per article fetch
+        if article_url and RESOLVE_DEEP_LINKS:
+            program_url = fetch_program_url(article_url)
+            time.sleep(random.uniform(1.0, 2.0))   # polite delay per article fetch
+        else:
+            program_url = article_url or source["url"]
 
         row = {
             "name":         name,
@@ -394,8 +419,11 @@ def scrape_html(source, max_pages=3):
             if st == "Closed":
                 continue
 
-            program_url = fetch_program_url(article_url) if article_url else source["url"]
-            time.sleep(random.uniform(1.0, 2.0))
+            if article_url and RESOLVE_DEEP_LINKS:
+                program_url = fetch_program_url(article_url)
+                time.sleep(random.uniform(1.0, 2.0))
+            else:
+                program_url = article_url or source["url"]
 
             row = {
                 "name":        name,
@@ -456,7 +484,10 @@ print(f"Total: {len(df)} scholarships")
 
 if not df.empty:
     output_path = "scholarship/scholarships.json"
+    pathlib.Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     data = df.to_dict(orient="records") 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2)
-   
+    print(f"Saved {len(df)} scholarships to {output_path}")
+else:
+    print("No scholarships found.")
